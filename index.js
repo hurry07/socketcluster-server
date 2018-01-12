@@ -23,15 +23,15 @@ module.exports.SCSocket = require('./scsocket');
 /**
  * Creates an http.Server exclusively used for WS upgrades.
  *
- * @param {Number} port
- * @param {Function} callback
- * @param {Object} options
+ * @param {Number}   port
+ * @param {Object}   options
+ * @param {Function} fn
  * @return {SCServer} websocket cluster server
  * @api public
  */
 
 module.exports.listen = function (port, options, fn) {
-  if ('function' == typeof options) {
+  if ('function' === typeof options) {
     fn = options;
     options = {};
   }

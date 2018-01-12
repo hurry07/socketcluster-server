@@ -73,7 +73,7 @@ var SCServer = function (options) {
   this._middleware[this.MIDDLEWARE_AUTHENTICATE] = [];
 
   this.origins = opts.origins;
-  this._allowAllOrigins = this.origins.indexOf('*:*') != -1;
+  this._allowAllOrigins = this.origins.indexOf('*:*') !== -1;
 
   this.ackTimeout = opts.ackTimeout;
   this.handshakeTimeout = opts.handshakeTimeout;
@@ -191,9 +191,13 @@ SCServer.prototype.setAuthEngine = function (authEngine) {
 SCServer.prototype.setCodecEngine = function (codecEngine) {
   this.codec = codecEngine;
 };
-
+/**
+ * 底层 socket 连接出错
+ * @param error
+ * @private
+ */
 SCServer.prototype._handleServerError = function (error) {
-  if (typeof error == 'string') {
+  if (typeof error === 'string') {
     error = new ServerProtocolError(error);
   }
   this.emit('error', error);
@@ -247,7 +251,7 @@ SCServer.prototype._subscribeSocketToSingleChannel = function (socket, channelOp
 
   var channelName = channelOptions.channel;
 
-  if (typeof channelName != 'string') {
+  if (typeof channelName !== 'string') {
     callback && callback('Socket ' + socket.id + ' provided an invalid channel name');
     return;
   }
@@ -304,7 +308,7 @@ SCServer.prototype._unsubscribeSocket = function (socket, channels, callback) {
 SCServer.prototype._unsubscribeSocketFromSingleChannel = function (socket, channel, callback) {
   var self = this;
 
-  if (typeof channel != 'string') {
+  if (typeof channel !== 'string') {
     callback && callback('Socket ' + socket.id + ' provided an invalid channel name');
     return;
   }
@@ -326,11 +330,11 @@ SCServer.prototype._processTokenError = function (err) {
   var isBadToken = true;
 
   if (err) {
-    if (err.name == 'TokenExpiredError') {
+    if (err.name === 'TokenExpiredError') {
       authError = new AuthTokenExpiredError(err.message, err.expiredAt);
-    } else if (err.name == 'JsonWebTokenError') {
+    } else if (err.name === 'JsonWebTokenError') {
       authError = new AuthTokenInvalidError(err.message);
-    } else if (err.name == 'NotBeforeError') {
+    } else if (err.name === 'NotBeforeError') {
       authError = new AuthTokenNotBeforeError(err.message, err.date);
       // In this case, the token is good; it's just not active yet.
       isBadToken = false;
@@ -404,17 +408,21 @@ SCServer.prototype._processAuthToken = function (scSocket, signedAuthToken, call
     }
   });
 };
-
+/**
+ * 新连接接入
+ * @param wsSocket
+ * @param upgradeReq
+ * @private
+ */
 SCServer.prototype._handleSocketConnection = function (wsSocket, upgradeReq) {
   var self = this;
 
-  if (this.options.wsEngine == 'ws') {
+  if (this.options.wsEngine === 'ws') {
     // Normalize ws module to match uws module.
     wsSocket.upgradeReq = upgradeReq;
   }
 
   var id = this.generateId();
-
   var scSocket = new SCSocket(id, this, wsSocket);
   scSocket.exchange = self.exchange;
 
@@ -463,14 +471,14 @@ SCServer.prototype._handleSocketConnection = function (wsSocket, upgradeReq) {
   scSocket.on('#subscribe', function (channelOptions, res) {
     if (!channelOptions) {
       channelOptions = {};
-    } else if (typeof channelOptions == 'string') {
+    } else if (typeof channelOptions === 'string') {
       channelOptions = {
         channel: channelOptions
       };
     }
     // This is an invalid state; it means the client tried to subscribe before
     // having completed the handshake.
-    if (scSocket.state == scSocket.OPEN) {
+    if (scSocket.state === scSocket.OPEN) {
       self._subscribeSocket(scSocket, channelOptions, function (err) {
         if (err) {
           var error = new BrokerError('Failed to subscribe socket to the ' + channelOptions.channel + ' channel - ' + err);
@@ -533,10 +541,10 @@ SCServer.prototype._handleSocketConnection = function (wsSocket, upgradeReq) {
       if (err) {
         scSocket.emit('error', new BrokerError('Failed to unsubscribe socket from all channels - ' + err));
       } else {
-        if (type == 'disconnect') {
+        if (type === 'disconnect') {
           self.emit('_disconnection', scSocket, code, data);
           self.emit('disconnection', scSocket, code, data);
-        } else if (type == 'abort') {
+        } else if (type === 'abort') {
           self.emit('_connectionAbort', scSocket, code, data);
           self.emit('connectionAbort', scSocket, code, data);
         }
@@ -558,7 +566,7 @@ SCServer.prototype._handleSocketConnection = function (wsSocket, upgradeReq) {
     clearTimeout(scSocket._handshakeTimeoutRef);
 
     self._processAuthToken(scSocket, signedAuthToken, function (err, isBadToken) {
-      if (scSocket.state == scSocket.CLOSED) {
+      if (scSocket.state === scSocket.CLOSED) {
         return;
       }
 
@@ -619,7 +627,10 @@ SCServer.prototype.close = function () {
 SCServer.prototype.getPath = function () {
   return this._path;
 };
-
+/**
+ * 产生唯一 id
+ * @return {*}
+ */
 SCServer.prototype.generateId = function () {
   return base64id.generateId();
 };
@@ -641,7 +652,7 @@ SCServer.prototype.verifyHandshake = function (info, cb) {
 
   var req = info.req;
   var origin = info.origin;
-  if (origin == 'null' || origin == null) {
+  if (origin === 'null' || origin == null) {
     origin = '*';
   }
   var ok = false;
@@ -655,7 +666,8 @@ SCServer.prototype.verifyHandshake = function (info, cb) {
       ok = ~this.origins.indexOf(parts.hostname + ':' + parts.port) ||
         ~this.origins.indexOf(parts.hostname + ':*') ||
         ~this.origins.indexOf('*:' + parts.port);
-    } catch (e) {}
+    } catch (e) {
+    }
   }
 
   if (ok) {
@@ -690,7 +702,7 @@ SCServer.prototype.verifyHandshake = function (info, cb) {
 };
 
 SCServer.prototype._isPrivateTransmittedEvent = function (event) {
-  return typeof event == 'string' && event.indexOf('#') == 0;
+  return typeof event === 'string' && event.indexOf('#') === 0;
 };
 
 SCServer.prototype.verifyInboundEvent = function (socket, eventName, eventData, cb) {
@@ -735,7 +747,7 @@ SCServer.prototype._passThroughMiddleware = function (options, cb) {
   var event = options.event;
 
   if (this._isPrivateTransmittedEvent(event)) {
-    if (event == '#subscribe') {
+    if (event === '#subscribe') {
       var eventData = options.data || {};
       request.channel = eventData.channel;
       request.waitForAuth = eventData.waitForAuth;
@@ -767,7 +779,7 @@ SCServer.prototype._passThroughMiddleware = function (options, cb) {
           }
         );
       }
-    } else if (event == '#publish') {
+    } else if (event === '#publish') {
       if (this.allowClientPublish) {
         var eventData = options.data || {};
         request.channel = eventData.channel;
@@ -877,12 +889,13 @@ SCServer.prototype.verifyOutboundEvent = function (socket, eventName, eventData,
 
   var callbackInvoked = false;
 
-  if (eventName == '#publish') {
+  if (eventName === '#publish') {
     var request = {
       socket: socket,
       channel: eventData.channel,
       data: eventData.data
     };
+
     async.applyEachSeries(this._middleware[this.MIDDLEWARE_PUBLISH_OUT], request,
       function (err) {
         if (callbackInvoked) {

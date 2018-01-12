@@ -7,7 +7,12 @@ var InvalidArgumentsError = scErrors.InvalidArgumentsError;
 var SocketProtocolError = scErrors.SocketProtocolError;
 var TimeoutError = scErrors.TimeoutError;
 
-
+/**
+ * @param {string}   id
+ * @param {SCServer} server
+ * @param {*}        socket uws.Socket
+ * @constructor
+ */
 var SCSocket = function (id, server, socket) {
   var self = this;
 
@@ -43,7 +48,7 @@ var SCSocket = function (id, server, socket) {
 
   this.request = this.socket.upgradeReq || {};
 
-  if (this.server.options.wsEngine == 'uws') {
+  if (this.server.options.wsEngine === 'uws') {
     this.request.connection = this.socket._socket;
   }
   if (this.request.connection) {
@@ -87,7 +92,7 @@ var SCSocket = function (id, server, socket) {
     try {
       obj = self.decode(message);
     } catch (err) {
-      if (err.name == 'Error') {
+      if (err.name === 'Error') {
         err.name = 'InvalidMessageError';
       }
       Emitter.prototype.emit.call(self, 'error', err);
@@ -95,7 +100,7 @@ var SCSocket = function (id, server, socket) {
     }
 
     // If pong
-    if (obj == '#2') {
+    if (obj === '#2') {
       var token = self.getAuthToken();
       if (self.server.isAuthTokenExpired(token)) {
         self.deauthenticate();
@@ -126,24 +131,30 @@ SCSocket.ignoreStatuses = scErrors.socketProtocolIgnoreStatuses;
 SCSocket.errorStatuses = scErrors.socketProtocolErrorStatuses;
 
 SCSocket.prototype._sendPing = function () {
-  if (this.state != this.CLOSED) {
+  if (this.state !== this.CLOSED) {
     this.sendObject('#1');
   }
 };
-
+/**
+ * 接受 server 端非 pong 的 message
+ * @param obj     解析后的消息对象
+ * @param message 原始消息
+ * @private
+ */
 SCSocket.prototype._handleEventObject = function (obj, message) {
   var self = this;
 
-  if (obj && obj.event != null) {
+  if (obj && obj.event != null) { // 如果是 {event:...}
     var eventName = obj.event;
 
     if (self._localEvents[eventName] == null) {
       var response = new Response(self, obj.cid);
+
       self.server.verifyInboundEvent(self, eventName, obj.data, function (err, newEventData, ackData) {
         if (err) {
           response.error(err, ackData);
         } else {
-          if (eventName == '#disconnect') {
+          if (eventName === '#disconnect') {
             var disconnectData = newEventData || {};
             self._onSCClose(disconnectData.code, disconnectData.data);
           } else {
@@ -161,7 +172,8 @@ SCSocket.prototype._handleEventObject = function (obj, message) {
         }
       });
     }
-  } else if (obj && obj.rid != null) {
+
+  } else if (obj && obj.rid != null) { // 如果有回调函数
     // If incoming message is a response to a previously sent message
     var ret = self._callbackMap[obj.rid];
     if (ret) {
@@ -170,6 +182,7 @@ SCSocket.prototype._handleEventObject = function (obj, message) {
       var rehydratedError = scErrors.hydrateError(obj.error);
       ret.callback(rehydratedError, obj.data);
     }
+
   } else {
     // The last remaining case is to treat the message as raw
     Emitter.prototype.emit.call(self, 'raw', message);
@@ -202,11 +215,11 @@ SCSocket.prototype._onSCClose = function (code, data) {
   clearInterval(this._pingIntervalTicker);
   clearTimeout(this._pingTimeoutTicker);
 
-  if (this.state != this.CLOSED) {
+  if (this.state !== this.CLOSED) {
     var prevState = this.state;
     this.state = this.CLOSED;
 
-    if (prevState == this.CONNECTING) {
+    if (prevState === this.CONNECTING) {
       // Private connectAbort event for internal use only
       Emitter.prototype.emit.call(this, '_connectAbort', code, data);
       Emitter.prototype.emit.call(this, 'connectAbort', code, data);
@@ -215,6 +228,7 @@ SCSocket.prototype._onSCClose = function (code, data) {
       Emitter.prototype.emit.call(this, '_disconnect', code, data);
       Emitter.prototype.emit.call(this, 'disconnect', code, data);
     }
+
     // Private close event for internal use only
     Emitter.prototype.emit.call(this, '_close', code, data);
     Emitter.prototype.emit.call(this, 'close', code, data);
@@ -235,12 +249,12 @@ SCSocket.prototype._onSCClose = function (code, data) {
 SCSocket.prototype.disconnect = function (code, data) {
   code = code || 1000;
 
-  if (typeof code != 'number') {
+  if (typeof code !== 'number') {
     var err = new InvalidArgumentsError('If specified, the code argument must be a number');
     Emitter.prototype.emit.call(this, 'error', err);
   }
 
-  if (this.state != this.CLOSED) {
+  if (this.state !== this.CLOSED) {
     var packet = {
       code: code,
       data: data
@@ -317,7 +331,13 @@ SCSocket.prototype.sendObject = function (object, options) {
     this.sendObjectSingle(object);
   }
 };
-
+/**
+ * 发送消息到远程
+ * @param event
+ * @param data
+ * @param callback
+ * @param options
+ */
 SCSocket.prototype.emit = function (event, data, callback, options) {
   var self = this;
 
@@ -326,15 +346,17 @@ SCSocket.prototype.emit = function (event, data, callback, options) {
       var eventObject = {
         event: event
       };
+
       if (newData !== undefined) {
         eventObject.data = newData;
       }
 
       if (err) {
         if (callback) {
-          eventObject.cid = self._nextCallId();
+          eventObject.cid = self._nextCallId(); // callback id
           callback(err, eventObject);
         }
+
       } else {
         if (callback) {
           eventObject.cid = self._nextCallId();
@@ -347,6 +369,7 @@ SCSocket.prototype.emit = function (event, data, callback, options) {
 
           self._callbackMap[eventObject.cid] = {callback: callback, timeout: timeout};
         }
+
         if (options && options.useCache && options.stringifiedData != null) {
           // Optimized
           self.send(options.stringifiedData);
@@ -355,8 +378,9 @@ SCSocket.prototype.emit = function (event, data, callback, options) {
         }
       }
     });
+
   } else {
-    Emitter.prototype.emit.apply(this, arguments);
+    Emitter.prototype.emit.apply(this, arguments); // 如果是内置消息, 抛出
   }
 };
 
